@@ -1,7 +1,5 @@
-export interface Player {
+export interface NotifyUser {
   id: number;
-  gamerTag: string;
   name: string;
-  teamId: number;
-  ready: boolean;
+  phoneNumber: string;
 }

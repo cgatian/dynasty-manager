@@ -1,83 +1,62 @@
 import './app.css';
-import { useEffect, useState } from 'react';
-import type { Player } from './types';
-import { getPlayers, updatePlayers } from './api';
-import { Button, CircularProgress } from '@mui/material';
-import { PlayerInfo } from './components/PlayerInfo';
-import { AdvanceDialog } from './components/AdvanceDialog';
+import { useState } from 'react';
+import { Alert, Button, CircularProgress, Typography } from '@mui/material';
+import { sendNotifications } from './api';
 
 function App() {
-  const [displayAdvanceDialog, setDisplayAdvanceDialog] = useState(false);
-  const [players, setPlayers] = useState<Player[] | undefined>();
-  const [loading, setLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState<string | undefined>();
 
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        const data = await getPlayers();
-        setPlayers(data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPlayers();
-  }, []);
-
-  const handleToggleReady = async (player: Player) => {
-    const updatedPlayers = [...players!];
-    const newPlayer = updatedPlayers.find((p) => p.id === player.id)!;
-    newPlayer.ready = !newPlayer?.ready;
-    const res = await updatePlayers(updatedPlayers);
-    setPlayers(res);
-  };
-
-  const handlePromptAdvanceDialog = () => {
-    setDisplayAdvanceDialog(true);
-  };
-
-  const handleAdvanceWeek = async (confirmed: boolean) => {
-    setDisplayAdvanceDialog(false);
-    if (confirmed) {
-      const updatedPlayers = [...players!];
-      updatedPlayers.forEach((player) => (player.ready = false));
-      setLoading(true);
-      const res = await updatePlayers(updatedPlayers);
-      setPlayers(res);
+  const handleSend = async () => {
+    try {
+      setIsSending(true);
+      setStatus('idle');
+      setMessage(undefined);
+      await sendNotifications([-1]);
+      setStatus('success');
+      setMessage('Notification sent!');
+    } catch (error) {
+      console.error(error);
+      setStatus('error');
+      setMessage('Failed to send notification. Check the backend logs.');
+    } finally {
+      setIsSending(false);
     }
   };
 
   return (
-    <>
-      {loading && (
-        <div className="loading-container">
-          <CircularProgress size="6rem" />
-        </div>
+    <div className="app-shell">
+      <Typography variant="h4" component="h1">
+        Dynasty Notification Test
+      </Typography>
+      <Typography variant="body1" component="p" className="app-subtitle">
+        Click the button below to call the backend with <code>userIds = [-1]</code>.
+      </Typography>
+      <Button
+        className="notify-btn"
+        variant="contained"
+        color="primary"
+        size="large"
+        disabled={isSending}
+        onClick={handleSend}
+      >
+        {isSending ? 'Sending…' : 'Send Test Notification'}
+      </Button>
+      {isSending && <CircularProgress size="2rem" />}
+      {status !== 'idle' && message && (
+        <Alert
+          className="notify-alert"
+          severity={status === 'success' ? 'success' : 'error'}
+          onClose={() => {
+            setStatus('idle');
+            setMessage(undefined);
+          }}
+        >
+          {message}
+        </Alert>
       )}
-      {!loading && (
-        <div className="player-list">
-          {players &&
-            players
-              .sort((a, b) => (a.ready && !b.ready ? 1 : -1))
-              .map((player) => {
-                return (
-                  <PlayerInfo key={player.id} player={player} onToggleReady={handleToggleReady} />
-                );
-              })}
-          <AdvanceDialog open={displayAdvanceDialog} onClose={handleAdvanceWeek} />
-          <div style={{ flex: '1 1 auto' }} />
-          <Button
-            className="advance-btn"
-            variant="contained"
-            color="warning"
-            onClick={() => handlePromptAdvanceDialog()}
-          >
-            Advance Week
-          </Button>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
